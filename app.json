@@ -3,16 +3,37 @@
     "name": "EmergencyApp",
     "slug": "EmergencyApp",
     "version": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/c180f013-a05e-4cc5-91cf-8eba7c5f2ce9"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "화재 경보 소리를 감지하기 위해 마이크를 사용합니다."
+        }
+      ],
       [
         "react-native-ble-plx",
         {
@@ -29,8 +50,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "대피 경로 안내를 위해 주변 블루투스 비콘을 스캔합니다.",
-        "NSBluetoothPeripheralUsageDescription": "대피 경로 안내를 위해 주변 블루투스 비콘을 스캔합니다."
-      }
+        "NSBluetoothPeripheralUsageDescription": "대피 경로 안내를 위해 주변 블루투스 비콘을 스캔합니다.",
+        "NSMicrophoneUsageDescription": "화재 경보 소리를 감지하기 위해 마이크를 사용합니다.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.gunwoochoi.EmergencyApp"
     },
     "android": {
       "adaptiveIcon": {
@@ -43,8 +67,11 @@
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.gunwoochoi.EmergencyApp",
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"

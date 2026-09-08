@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Chrome 내장 AI 테스트</title>
+<style>
+  body { font-family: 'Malgun Gothic', sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 16px; margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+  .status { padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; font-family: monospace; font-size: 13px; }
+  .ok { background: #e3f7e6; color: #1a6b2a; }
+  .no { background: #fbe4e4; color: #a3231f; }
+  textarea { width: 100%; height: 80px; font-size: 14px; padding: 8px; box-sizing: border-box; }
+  button { padding: 8px 16px; font-size: 14px; margin-top: 8px; cursor: pointer; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; white-space: pre-wrap; font-size: 13px; }
+  .err { color: #a3231f; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Chrome 내장 AI (Gemini Nano) 동작 테스트</h1>
+<p>이 페이지는 강의자 PC의 Chrome에서 <b>번역</b>과 <b>키워드 추출</b>이 실제로 되는지 확인하는 진단용 페이지입니다.</p>
+
+<h2>1. API 사용 가능 여부</h2>
+<div id="status-list"></div>
+
+<h2>2. 번역 + 키워드 추출 테스트</h2>
+<p>학생이 입력했다고 가정한 원문(영어 예시)을 넣고 테스트해보세요.</p>
+<textarea id="input-text">Could you explain again how the WebGPU fallback works when the browser doesn't support it?</textarea>
+<br>
+<button id="run-btn">번역 + 키워드 추출 실행</button>
+<pre id="output">결과가 여기 표시됩니다.</pre>
+
+<script>
+const statusList = document.getElementById('status-list');
+const output = document.getElementById('output');
+
+function addStatus(name, available, extra) {
+  const div = document.createElement('div');
+  div.className = 'status ' + (available ? 'ok' : 'no');
+  div.textContent = (available ? '✓ ' : '✗ ') + name + (extra ? ' — ' + extra : '');
+  statusList.appendChild(div);
+}
+
+async function checkAPIs() {
+  addStatus('LanguageModel (Prompt API)', 'LanguageModel' in self);
+  addStatus('Translator API', 'Translator' in self);
+  addStatus('LanguageDetector API', 'LanguageDetector' in self);
+  addStatus('Summarizer API', 'Summarizer' in self);
+
+  if ('LanguageModel' in self) {
+    try {
+      const avail = await LanguageModel.availability();
+      addStatus('LanguageModel 상태', avail === 'available', avail);
+    } catch (e) {
+      addStatus('LanguageModel 상태 확인 실패', false, e.message);
+    }
+  }
+  if ('Translator' in self) {
+    try {
+      const avail = await Translator.availability({ sourceLanguage: 'en', targetLanguage: 'ko' });
+      addStatus('Translator(en→ko) 상태', avail === 'available', avail);
+    } catch (e) {
+      addStatus('Translator 상태 확인 실패', false, e.message);
+    }
+  }
+
+  if (!('LanguageModel' in self) && !('Translator' in self)) {
+    const warn = document.createElement('p');
+    warn.className = 'err';
+    warn.textContent = '두 API 모두 감지되지 않았습니다. 아래 안내에 따라 chrome://flags 설정을 확인해주세요.';
+    statusList.appendChild(warn);
+  }
+}
+checkAPIs();
+
+function progressMonitor(labelPrefix) {
+  return (m) => {
+    m.addEventListener('downloadprogress', (e) => {
+      const pct = Math.round(e.loaded * 100);
+      output.textContent = `${labelPrefix} 모델 다운로드 중... ${pct}%\n(처음 한 번만 받으면 되고, 용량이 커서 몇 분 걸릴 수 있습니다. 창을 닫지 말고 기다려주세요.)`;
+    });
+  };
+}
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  const text = document.getElementById('input-text').value.trim();
+  output.textContent = '처리 중... (모델을 처음 받는 거라면 다운로드 진행률이 곧 표시됩니다)';
+  let result = '';
+
+  try {
+    // 1) 번역
+    if ('Translator' in self) {
+      const translator = await Translator.create({
+        sourceLanguage: 'en',
+        targetLanguage: 'ko',
+        monitor: progressMonitor('번역(Translator)')
+      });
+      const translated = await translator.translate(text);
+      result += '[번역 결과 - Translator API]\n' + translated + '\n\n';
+    } else {
+      result += '[번역] Translator API 사용 불가 — 건너뜀\n\n';
+    }
+
+    // 2) 키워드 추출 (Prompt API)
+    if ('LanguageModel' in self) {
+      const session = await LanguageModel.create({
+        monitor: progressMonitor('키워드 추출(LanguageModel)')
+      });
+      const prompt = `다음 문장에서 핵심 키워드를 한국어로 1~2개만 뽑아서 쉼표로 구분해 답해줘. 다른 설명은 붙이지 마.\n\n문장: "${text}"`;
+      const keywords = await session.prompt(prompt);
+      result += '[키워드 추출 결과 - Prompt API]\n' + keywords + '\n';
+    } else {
+      result += '[키워드 추출] LanguageModel(Prompt API) 사용 불가 — 건너뜀\n';
+    }
+  } catch (e) {
+    result += '\n[오류 발생]\n' + e.name + ': ' + e.message;
+  }
+
+  output.textContent = result;
+});
+</script>
+</body>
+</html>

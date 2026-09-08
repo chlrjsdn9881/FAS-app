@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,37 @@ import {
   StyleSheet,
   SafeAreaView,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 
 const FLOOR_OPTIONS = ['B1', '1F', '2F', '3F', '4F', '5F'];
 
 export default function FloorSelectScreen({ onSelectFloor }) {
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.25, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 600, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.emergency} />
 
       <View style={styles.header}>
-        <Text style={styles.headerEmoji}>🔥</Text>
+        <Animated.Text style={[styles.headerEmoji, { transform: [{ scale: pulseAnim }] }]}>🔥</Animated.Text>
         <Text style={styles.headerTitle}>화재 비상 안내</Text>
         <Text style={styles.headerSub}>Fire Emergency Guide</Text>
       </View>
 
-      <View style={styles.body}>
+      <Animated.View style={[styles.body, { opacity: fadeAnim }]}>
         <Text style={styles.question}>현재 층을 선택하세요</Text>
         <Text style={styles.hint}>Select your current floor</Text>
 
@@ -38,7 +52,7 @@ export default function FloorSelectScreen({ onSelectFloor }) {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </Animated.View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>침착하게 행동하세요 · Stay calm</Text>

@@ -1,14 +1,21 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ImageBackground, Animated } from 'react-native';
-import Svg, { Rect, Circle, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Rect, Circle, Polyline, Text as SvgText, Path } from 'react-native-svg';
 import { COLORS } from '../constants/colors';
 
-const FLOOR_MAP_IMAGE = require('../../assets/floor_map_clean.png');
+const FLOOR_IMAGES = {
+  'b1f':   require('../../assets/floor_map_b1f.png'),
+  '1f':    require('../../assets/floor_map_1f.png'),
+  '2f':    require('../../assets/floor_map_2f.png'),
+  '3f':    require('../../assets/floor_map_3f.png'),
+  '4f':    require('../../assets/floor_map_4f.png'),
+  '5f':    require('../../assets/floor_map_5f.png'),
+};
 
 const AnimatedPolyline = Animated.createAnimatedComponent(Polyline);
 const AnimatedCircle   = Animated.createAnimatedComponent(Circle);
 
-export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoints, extinguisherRoutePoints, userLocation, bleStatus }) {
+export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoints, extinguisherRoutePoints, userLocation, bleStatus, currentNodeId, extinguisherStatus }) {
   const { width, height } = mapSize;
   // userLocation prop이 있으면 우선 사용 (BLE 위치), 없으면 floorData 기본값
   const loc = userLocation || floorData.userLocation;
@@ -51,7 +58,7 @@ export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoi
 
     return (
       <View style={[styles.mapContainer, { width, height }]}>
-        <ImageBackground source={FLOOR_MAP_IMAGE} style={{ width, height }} resizeMode="stretch">
+        <ImageBackground source={FLOOR_IMAGES[floorData.imageKey || 'clean']} style={{ width, height }} resizeMode="stretch">
           <Svg width={width} height={height} viewBox="0 0 100 100" preserveAspectRatio="none">
 
             {/* ── 출구 경로 (초록): 글로우 3겹 + 흐르는 선 ── */}
@@ -84,10 +91,17 @@ export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoi
               </React.Fragment>
             )}
 
-            {/* ── 노드 ── */}
+            {/* ── 노드 (정상/비상구만) ── */}
             {Object.keys(floorData.nodes).map(function(nodeId) {
               var coord = floorData.nodes[nodeId];
               var type  = nodeTypes[nodeId] || 'extinguisher';
+              var extStatus = extinguisherStatus && extinguisherStatus[nodeId];
+              var isAbnormal = extStatus && extStatus !== 'normal';
+
+              // 이상 상태 노드는 위치 표시 위에 그리기 위해 아래에서 별도 렌더링
+              if (isAbnormal) return null;
+              // 현재 위치 노드는 숨김
+              if (nodeId === currentNodeId) return null;
 
               if (type === 'exit') {
                 return (
@@ -100,7 +114,6 @@ export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoi
               if (type === 'corner') {
                 return <Circle key={'n' + nodeId} cx={coord.x} cy={coord.y} r={0.7} fill="#444" />;
               }
-              // 소화기: 속 빈 링
               return (
                 <Circle key={'n' + nodeId} cx={coord.x} cy={coord.y} r={1.3}
                   fill="none" stroke={COLORS.extinguisherIcon} strokeWidth="0.45" />
@@ -118,6 +131,18 @@ export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoi
               cx={loc.x} cy={loc.y}
               r={1.2} fill={COLORS.userLocation}
             />
+
+            {/* ── 이상 상태 소화기 노드 (위치 표시 위에 렌더링) ── */}
+            {Object.keys(floorData.nodes).map(function(nodeId) {
+              var coord = floorData.nodes[nodeId];
+              var extStatus = extinguisherStatus && extinguisherStatus[nodeId];
+              var isAbnormal = extStatus && extStatus !== 'normal';
+              if (!isAbnormal) return null;
+              return (
+                <Circle key={'a' + nodeId} cx={coord.x} cy={coord.y} r={2.2}
+                  fill="#E53935" opacity={0.95} />
+              );
+            })}
           </Svg>
         </ImageBackground>
 
@@ -156,15 +181,30 @@ export default function FloorMap({ floorData, activeRoute, mapSize, exitRoutePoi
   return (
     <View style={[styles.mapContainer, { width, height }]}>
       <Svg width={width} height={height}>
+        {/* 건물 외곽선 (ㄱ자 등 다각형) */}
+        {floorData.buildingOutlinePts ? (
+          <Path
+            d={'M ' + floorData.buildingOutlinePts
+              .map(function(p) { return px(p.x) + ' ' + py(p.y); })
+              .join(' L ') + ' Z'}
+            fill="#F5F0E8"
+            stroke={COLORS.wall}
+            strokeWidth={2}
+          />
+        ) : null}
+
         {floorData.rooms.map(function(room, i) {
           return (
             <React.Fragment key={'room-' + i}>
               <Rect x={px(room.x)} y={py(room.y)} width={px(room.width)} height={py(room.height)}
-                fill={COLORS.room} stroke={COLORS.wall} strokeWidth={1.5} />
-              <SvgText x={px(room.x + room.width / 2)} y={py(room.y + room.height / 2)}
-                textAnchor="middle" alignmentBaseline="middle" fontSize={10} fill={COLORS.textSecondary}>
-                {room.label}
-              </SvgText>
+                fill={room.fill || COLORS.room} stroke={COLORS.wall} strokeWidth={1} />
+              {room.label ? (
+                <SvgText x={px(room.x + room.width / 2)} y={py(room.y + room.height / 2)}
+                  textAnchor="middle" alignmentBaseline="middle"
+                  fontSize={room.labelSize || 9} fill={COLORS.textSecondary}>
+                  {room.label}
+                </SvgText>
+              ) : null}
             </React.Fragment>
           );
         })}

@@ -16,54 +16,85 @@ import FloorMap from '../components/FloorMap';
 import RouteToggle from '../components/RouteToggle';
 import { getShortestToAny } from '../utils/pathfinding';
 import useBLELocation from '../hooks/useBLELocation';
+import useExtinguisherStatus from '../hooks/useExtinguisherStatus';
+import { fetchFloorMap, convertApiFloorData } from '../services/api';
 
 export default function MapScreen({ floor, initialRoute, onBack }) {
   const [activeRoute, setActiveRoute] = useState(initialRoute);
   const { width, height } = useWindowDimensions();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // API에서 받아온 층 데이터 (실패 시 null → FLOORS[floor] 폴백)
+  const [apiFloorData, setApiFloorData] = useState(null);
+
+  // 소화기 상태 실시간 (SSE)
+  const { statusMap: extinguisherStatus, connected: sseConnected } = useExtinguisherStatus(floor);
+
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
   }, []);
 
-  const floorData = FLOORS[floor];
+  // 층 그래프 API fetch — 이미지 맵 층은 로컬 데이터 사용
+  useEffect(() => {
+    if (FLOORS[floor] && FLOORS[floor].useImageMap) return;
+    fetchFloorMap(floor)
+      .then(function(data) {
+        setApiFloorData(convertApiFloorData(data, FLOORS[floor]));
+        console.log('[API] floor map loaded:', floor);
+      })
+      .catch(function(e) {
+        console.warn('[API] fetchFloorMap failed, using local data:', e.message);
+      });
+  }, [floor]);
 
-  // BLE로 현재 위치 노드 감지 (image map 층만 활성화)
+  // API 데이터 우선, 없으면 하드코딩 폴백
+  const floorData = apiFloorData || FLOORS[floor];
+
+  // BLE로 현재 위치 노드 감지
   const bleEnabled = !!floorData.useImageMap;
-  const { nearestNodeId, bleStatus } = useBLELocation(bleEnabled);
+  const { nearestNodeId, userPosition, bleStatus } = useBLELocation(bleEnabled, floorData.nodes);
 
-  // BLE로 감지된 노드가 있으면 사용, 없으면 기본값
   const currentNodeId = (bleEnabled && nearestNodeId) ? nearestNodeId : floorData.userNodeId;
-  const currentLocation = floorData.nodes
-    ? (floorData.nodes[currentNodeId] || floorData.userLocation)
-    : floorData.userLocation;
+  const currentLocation = userPosition ||
+    (floorData.nodes ? (floorData.nodes[currentNodeId] || floorData.userLocation) : floorData.userLocation);
 
-  // BLE 노드가 바뀔 때마다 경로 재계산
+  // 정상 소화기만 필터링
+  const availableExtinguishers = useMemo(() => {
+    return floorData.extinguisherNodeIds.filter(function(id) {
+      var status = extinguisherStatus[id];
+      return !status || status === 'normal';
+    });
+  }, [floorData.extinguisherNodeIds, extinguisherStatus]);
+
+  const isAtExtinguisher = availableExtinguishers.includes(String(currentNodeId));
+
   const exitRoutePoints = useMemo(() => {
     if (!floorData.useImageMap) return undefined;
     const path = getShortestToAny(floorData.graph, currentNodeId, floorData.exitNodeIds);
     return path ? path.map((id) => floorData.nodes[id]) : [];
-  }, [floor, currentNodeId]);
+  }, [floorData, currentNodeId]);
 
   const extinguisherRoutePoints = useMemo(() => {
     if (!floorData.useImageMap) return undefined;
-    const path = getShortestToAny(floorData.graph, currentNodeId, floorData.extinguisherNodeIds);
+    // 현재 노드가 소화기면 path=[currentNodeId](길이 1) → FloorMap에서 선 안 그림
+    const path = getShortestToAny(floorData.graph, currentNodeId, availableExtinguishers);
     return path ? path.map((id) => floorData.nodes[id]) : [];
-  }, [floor, currentNodeId]);
+  }, [floorData, currentNodeId, availableExtinguishers]);
 
-  // 여백 없이 전체 너비, 남은 화면 높이 최대 활용
   const mapWidth = width;
-  // floor_map.png 비율 3072:4096 = 0.75 (세로가 더 긺)
-  const imageRatio = floorData.useImageMap ? (4096 / 3072) : 1;
-  const maxMapHeight = height - 200; // header + banner + toggle 제외
+  const imageRatio = floorData.useImageMap
+    ? (floorData.imageRatio || (4096 / 3072))
+    : (floorData.mapRatio || 1);
+  const maxMapHeight = height - 200;
   const mapHeight = Math.min(mapWidth * imageRatio, maxMapHeight);
 
   const routeLabel =
-    activeRoute === 'both'
-      ? '🗺️ 출구(초록) · 소화기(파랑) 전체 경로'
-      : activeRoute === 'exit'
-      ? '🚪 출구 경로'
-      : '🧯 소화기 경로';
+    activeRoute === 'exit' ? '🚪 출구 경로'
+    : activeRoute === 'extinguisher'
+      ? (isAtExtinguisher ? '🧯 현재 위치에 소화기 있음' : '🧯 소화기 경로')
+    : isAtExtinguisher
+      ? '🗺️ 출구(초록) · 현재 위치에 소화기 있음(파랑)'
+      : '🗺️ 출구(초록) · 소화기(파랑) 전체 경로';
 
   const bannerColor =
     activeRoute === 'exit' ? COLORS.buttonExit
@@ -81,11 +112,6 @@ export default function MapScreen({ floor, initialRoute, onBack }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🔥 화재 발생 · {floor}</Text>
         <View style={styles.placeholder} />
-      </View>
-
-      {/* Route instruction banner */}
-      <View style={[styles.routeBanner, { backgroundColor: bannerColor }]}>
-        <Text style={styles.routeText}>{routeLabel}</Text>
       </View>
 
       {/* Map — fade-in + ScrollView 핀치 줌 */}
@@ -106,8 +132,15 @@ export default function MapScreen({ floor, initialRoute, onBack }) {
             extinguisherRoutePoints={extinguisherRoutePoints}
             userLocation={currentLocation}
             bleStatus={bleStatus}
+            currentNodeId={currentNodeId}
+            extinguisherStatus={extinguisherStatus}
           />
         </ScrollView>
+
+        {/* 지도 왼쪽 상단 오버레이 — ScrollView 밖이라 줌해도 고정 */}
+        <View style={[styles.mapOverlay, { backgroundColor: bannerColor }]}>
+          <Text style={styles.mapOverlayText}>{routeLabel}</Text>
+        </View>
       </Animated.View>
 
       {/* Route toggle buttons */}
@@ -146,20 +179,33 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 38,
   },
-  routeBanner: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
+  mapOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: COLORS.emergency,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    maxWidth: '60%',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  routeText: {
+  mapOverlayText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
+    lineHeight: 24,
   },
   mapWrapper: {
     flex: 1,
   },
   mapContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

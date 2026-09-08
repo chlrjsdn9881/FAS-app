@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,17 @@ import {
   StyleSheet,
   SafeAreaView,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 
 // Intermediate screen: user picks action (exit or extinguisher)
 export default function EmergencyScreen({ floor, onSelectAction, onChangeFloor }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.emergency} />
@@ -22,7 +28,7 @@ export default function EmergencyScreen({ floor, onSelectAction, onChangeFloor }
         </TouchableOpacity>
       </View>
 
-      <View style={styles.body}>
+      <Animated.View style={[styles.body, { opacity: fadeAnim }]}>
         <Text style={styles.instruction}>대피 또는 소화기를 선택하세요</Text>
         <Text style={styles.sub}>Choose your action</Text>
 
@@ -45,7 +51,7 @@ export default function EmergencyScreen({ floor, onSelectAction, onChangeFloor }
           <Text style={styles.actionLabel}>소화기 찾기</Text>
           <Text style={styles.actionDesc}>가장 가까운 소화기로 안내합니다</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>⚠️ 엘리베이터 사용 금지 · Do not use elevator</Text>
