@@ -35,6 +35,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF0000"
+        }
+      ],
+      [
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
@@ -71,7 +78,8 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.gunwoochoi.EmergencyApp",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
