@@ -34,7 +34,7 @@ import httpx
 router = APIRouter(prefix="/api/vision", tags=["vision"])
 
 SNAPSHOTS_DIR = "snapshots"
-SERVER_BASE_URL = "http://168.131.224.195:8000"  # 서버 공인 IP
+SERVER_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://168.131.224.195:8000")  # 서버 공인 IP
 
 # 모델 첫 요청 시 로드 (이후 메모리 유지)
 _model = None
