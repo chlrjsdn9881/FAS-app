@@ -8,7 +8,7 @@ try {
   console.warn('[Push] expo-notifications not available:', e.message);
 }
 
-var BASE_URL = 'http://168.131.224.195:8000';
+var BASE_URL = 'http://43.201.8.118:8000';
 
 export function setNotificationHandler() {
   if (!Notifications) return;

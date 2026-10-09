@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getOrRefreshToken, clearToken, login } from '../services/auth';
 
-var BASE_URL = 'http://168.131.224.195:8000';
+var BASE_URL = 'http://43.201.8.118:8000';
 
 var EventSource = null;
 try {

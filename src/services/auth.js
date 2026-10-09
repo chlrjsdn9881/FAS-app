@@ -7,7 +7,7 @@ try {
   console.warn('[Auth] expo-secure-store not available:', e.message);
 }
 
-var BASE_URL  = 'http://168.131.224.195:8000';
+var BASE_URL  = 'http://43.201.8.118:8000';
 var TOKEN_KEY = 'fas_auth_token';
 
 export async function getStoredToken() {

@@ -1,6 +1,6 @@
 import { getOrRefreshToken, login, clearToken } from './auth';
 
-var BASE_URL   = 'http://168.131.224.195:8000';
+var BASE_URL   = 'http://43.201.8.118:8000';
 var TIMEOUT_MS = 5000;
 
 function fetchWithTimeout(url, options) {
