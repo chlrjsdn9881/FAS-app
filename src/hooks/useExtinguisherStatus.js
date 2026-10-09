@@ -112,7 +112,10 @@ export default function useExtinguisherStatus(floor) {
         try {
           var data = JSON.parse(e.data);
           if (data.type === 'snapshot') {
-            setStatusMap(buildStatusMap(data.alerts, idToNodeRef.current));
+            // 서버가 알림(Alert)을 자동으로 "해결됨" 처리하지 않아 active 알림이 계속
+            // 쌓이므로, 이 스냅샷으로 상태를 덮어쓰면 이미 정상으로 돌아온 소화기가
+            // 계속 이탈/장애물 등으로 보인다. 초기 상태는 REST로 받아온 실제 status
+            // (initMap)를 그대로 신뢰하고, 스냅샷은 무시한다.
           } else if (data.type === 'alert.created' || data.type === 'alert.updated') {
             var alert = data.alert;
             var nodeId = idToNodeRef.current[alert.extinguisher_id];
@@ -131,6 +134,22 @@ export default function useExtinguisherStatus(floor) {
               setStatusMap(function(prev) {
                 var next = Object.assign({}, prev);
                 delete next[nodeId];
+                return next;
+              });
+            }
+          } else if (data.type === 'event.created') {
+            // 상태가 "정상"으로 복귀할 때는 alert.resolved가 오지 않으므로,
+            // 상태 변경마다 항상 오는 event.created로 정상 복귀를 즉시 반영한다.
+            var evt = data.event;
+            var evtNodeId = evt && idToNodeRef.current[evt.extinguisher_id];
+            if (evtNodeId) {
+              setStatusMap(function(prev) {
+                var next = Object.assign({}, prev);
+                if (evt.status && evt.status !== 'normal') {
+                  next[evtNodeId] = evt.status;
+                } else {
+                  delete next[evtNodeId];
+                }
                 return next;
               });
             }
