@@ -42,3 +42,10 @@ firebase-service-account*.json
 # generated native folders
 /ios
 /android
+
+# secrets (keep local only)
+google-services.json
+src/config/appCredentials.js
+
+# local work files
+scratchpad/
