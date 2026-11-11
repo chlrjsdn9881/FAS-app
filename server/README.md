@@ -9,7 +9,7 @@
 
 ### 기존 파일 수정 내용
 
-#### `routers/sensors.py`
+#### `routers/sensors.py` (수정 부분 발췌: `routers/sensors_push_excerpt.py`)
 - `fire_detected` 상태 수신 시 push_tokens 테이블의 모든 토큰으로 Expo 푸시 알림 발송
 - 정상(normal) 상태 수신 시 해당 소화기의 활성 알림 자동 해제 + `alert.resolved` SSE 브로드캐스트
 
